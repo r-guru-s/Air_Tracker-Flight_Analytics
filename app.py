@@ -341,28 +341,6 @@ elif page == "🏢 Airport Analysis":
             WHERE a.iata_code = ?
         """, (selected_airport,))['count'][0]
         st.metric("Arrivals", f"{arrivals:,}")
-    
-    # Top Destinations from this airport
-    st.subheader("🎯 Top Destinations")
-    destinations = get_data("""
-        SELECT 
-            dest.iata_code,
-            dest.name,
-            dest.city,
-            COUNT(*) as flight_count
-        FROM flights f
-        LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
-        LEFT JOIN airports dest ON f.dest_icao = dest.icao_code
-        WHERE origin.iata_code = ?
-        GROUP BY dest.iata_code, dest.name, dest.city
-        ORDER BY flight_count DESC
-        LIMIT 10
-    """, (selected_airport,))
-    
-    fig = px.bar(destinations, x='name', y='flight_count',
-                 title='Most Frequent Destinations',
-                 labels={'name': 'Destination', 'flight_count': 'Flights'})
-    st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================================
 # ⏰ PAGE 5: DELAY INSIGHTS
