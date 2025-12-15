@@ -176,7 +176,7 @@ elif page == "✈️ Flight Explorer":
         )["iata_code"].tolist()
         selected_origin = st.selectbox("Origin Airport", ["All"] + airports)
 
-    # Base query: only non‑empty origin
+    # Base query: flights with a valid origin
     query = """
         SELECT
             f.flight_number,
@@ -196,7 +196,6 @@ elif page == "✈️ Flight Explorer":
         params.append(selected_airline)
 
     if selected_status != "All":
-        # when user selects a status, really filter to that status
         query += " AND f.status = ?"
         params.append(selected_status)
 
@@ -211,11 +210,12 @@ elif page == "✈️ Flight Explorer":
     st.subheader(f"📋 Showing {len(flights_df)} flights")
     st.dataframe(flights_df, use_container_width=True, height=400)
 
-    # Flight / Cancellation statistics, always based on current filter
-    if not flights_df.empty:
-        total_flights = len(flights_df)
+    # --- CANCELLATION METRICS BASED ON CURRENT FILTER ---
+    total_flights = len(flights_df)
+
+    if total_flights > 0 and "status" in flights_df.columns:
         canceled_count = (flights_df["status"] == "Canceled").sum()
-        canceled_pct = (canceled_count / total_flights) * 100 if total_flights else 0.0
+        canceled_pct = (canceled_count / total_flights) * 100
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total Flights", total_flights)
