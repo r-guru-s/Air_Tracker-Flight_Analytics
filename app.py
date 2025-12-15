@@ -178,22 +178,20 @@ elif page == "✈️ Flight Explorer":
     
     # Build query based on filters
     query = """
-SELECT
-    f.flight_number,
-    f.airline_name,
-    COALESCE(a.aircraft_model, 'N/A') AS aircraft_model,
-    COALESCE(a.manufacturer, 'N/A') AS manufacturer,
-    origin.iata_code AS origin,          -- no COALESCE here
-    origin.city      AS origin_city,
-    f.scheduled_dep,
-    f.actual_dep,
-    COALESCE(f.delay_dep, 0) AS delay_dep_min,
-    f.status
-FROM flights f
-LEFT JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
-JOIN airports origin ON f.origin_icao = origin.icao_code   -- INNER JOIN to force non‑empty origin
-WHERE 1 = 1
-"""
+        SELECT
+        f.flight_number,
+        f.airline_name,
+        origin.iata_code AS origin,          -- no COALESCE here
+        origin.city      AS origin_city,
+        f.scheduled_dep,
+        f.actual_dep,
+        COALESCE(f.delay_dep, 0) AS delay_dep_min,
+        f.status
+    FROM flights f
+    LEFT JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
+    JOIN airports origin ON f.origin_icao = origin.icao_code   -- INNER JOIN to force non‑empty origin
+    WHERE 1 = 1
+    """
 
     params = []
     if selected_airline != "All":
