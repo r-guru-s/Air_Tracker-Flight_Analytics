@@ -172,25 +172,25 @@ elif page == "✈️ Flight Explorer":
     
     # Build query based on filters
     query = """
-        SELECT 
-            f.flight_number,
-            f.airline_name,
-            a.aircraft_model,
-            origin.iata_code AS origin,
-            origin.city AS origin_city,
-            dest.iata_code AS destination,
-            dest.city AS dest_city,
-            f.scheduled_dep,
-            f.actual_dep,
-            f.delay_dep,
-            f.status
-        FROM flights f
-        LEFT JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
-        LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
-        LEFT JOIN airports dest ON f.dest_icao = dest.icao_code
-        WHERE 1=1
-    """
-    
+    SELECT
+        f.flight_number,
+        f.airline_name,
+        COALESCE(a.aircraft_model, 'N/A') AS aircraft_model,
+        COALESCE(a.manufacturer, 'N/A') AS manufacturer,
+        COALESCE(origin.iata_code, 'N/A') AS origin,
+        COALESCE(origin.city, 'N/A') AS origin_city,
+        COALESCE(dest.iata_code, 'N/A') AS destination,
+        COALESCE(dest.city, 'N/A') AS dest_city,
+        f.scheduled_dep,
+        f.actual_dep,
+        COALESCE(f.delay_dep, 0) AS delay_dep_min,
+        f.status
+    FROM flights f
+    LEFT JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
+    LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
+    LEFT JOIN airports dest   ON f.dest_icao   = dest.icao_code
+    WHERE 1 = 1
+"""
     params = []
     if selected_airline != "All":
         query += " AND f.airline_name = ?"
