@@ -155,8 +155,8 @@ if page == "🏠 Home Dashboard":
             origin.iata_code || '-' || dest.iata_code AS codes,
             COUNT(*) as flight_count
         FROM flights f
-        JOIN airports origin ON f.origin_icao = origin.icao_code
-        JOIN airports dest ON f.dest_icao = dest.icao_code
+        LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
+        LEFT JOIN airports dest ON f.dest_icao = dest.icao_code
         GROUP BY route, codes
         ORDER BY flight_count DESC
         LIMIT 10
