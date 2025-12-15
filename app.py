@@ -86,7 +86,7 @@ page = st.sidebar.radio(
 st.sidebar.markdown("---")
 st.sidebar.info("""
 **Air Tracker v1.0**  
-GUVI IIT-M Capstone Project  
+GUVI Project  
 Aviation Data Analytics  
 """)
 
@@ -146,27 +146,6 @@ if page == "🏠 Home Dashboard":
                      color='flight_count',
                      color_continuous_scale='Blues')
         st.plotly_chart(fig, use_container_width=True)
-    
-    # Busiest Routes
-    st.subheader("🔥 Top 10 Busiest Routes")
-    route_data = get_data("""
-        SELECT 
-            origin.city || ' → ' || dest.city AS route,
-            origin.iata_code || '-' || dest.iata_code AS codes,
-            COUNT(*) as flight_count
-        FROM flights f
-        LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
-        LEFT JOIN airports dest ON f.dest_icao = dest.icao_code
-        GROUP BY route, codes
-        ORDER BY flight_count DESC
-        LIMIT 10
-    """)
-    fig = px.bar(route_data, x='route', y='flight_count',
-                 title='Most Popular Routes',
-                 labels={'route': 'Route', 'flight_count': 'Number of Flights'},
-                 text='flight_count')
-    fig.update_traces(texttemplate='%{text}', textposition='outside')
-    st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================================
 # ✈️ PAGE 2: FLIGHT EXPLORER
@@ -235,7 +214,6 @@ elif page == "✈️ Flight Explorer":
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Flights", len(flights_df))
         col2.metric("Avg Delay (min)", f"{flights_df['delay_dep'].mean():.1f}")
-        col3.metric("On-Time %", f"{(flights_df['status'] == 'Landed').sum() / len(flights_df) * 100:.1f}%")
 
 # ============================================================================
 # 🛩️ PAGE 3: AIRCRAFT ANALYTICS
