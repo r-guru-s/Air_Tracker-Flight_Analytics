@@ -1,0 +1,561 @@
+import streamlit as st
+import sqlite3
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime
+
+# ============================================================================
+# 🔧 CONFIGURATION
+# ============================================================================
+
+st.set_page_config(
+    page_title="Air Tracker - Flight Analytics",
+    page_icon="✈️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ============================================================================
+# 🗄️ DATABASE CONNECTION
+# ============================================================================
+
+@st.cache_resource
+def get_connection():
+    """Create database connection"""
+    return sqlite3.connect('air_tracker.db', check_same_thread=False)
+
+def get_data(query, params=None):
+    """Execute SQL query and return DataFrame"""
+    conn = get_connection()
+    if params:
+        df = pd.read_sql_query(query, conn, params=params)
+    else:
+        df = pd.read_sql_query(query, conn)
+    return df
+
+# ============================================================================
+# 🎨 CUSTOM CSS STYLING
+# ============================================================================
+
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 3rem;
+        font-weight: bold;
+        text-align: center;
+        color: #1E88E5;
+        padding: 1rem;
+    }
+    .sub-header {
+        font-size: 1.5rem;
+        color: #424242;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 5px solid #1E88E5;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================================
+# 📊 SIDEBAR NAVIGATION
+# ============================================================================
+
+st.sidebar.title("🛩️ Navigation")
+st.sidebar.markdown("---")
+
+page = st.sidebar.radio(
+    "Go to:",
+    ["🏠 Home Dashboard", 
+     "✈️ Flight Explorer", 
+     "🛩️ Aircraft Analytics",
+     "🏢 Airport Analysis",
+     "⏰ Delay Insights",
+     "📊 SQL Query Results",
+     "👨‍💻 About Project"]
+)
+
+st.sidebar.markdown("---")
+st.sidebar.info("""
+**Air Tracker v1.0**  
+GUVI IIT-M Capstone Project  
+Aviation Data Analytics  
+""")
+
+# ============================================================================
+# 🏠 PAGE 1: HOME DASHBOARD
+# ============================================================================
+
+if page == "🏠 Home Dashboard":
+    st.markdown('<div class="main-header">✈️ AIR TRACKER: Flight Analytics</div>', 
+                unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">Real-time Aviation Data Insights</div>', 
+                unsafe_allow_html=True)
+    
+    # Summary Statistics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    total_flights = get_data("SELECT COUNT(*) as count FROM flights")['count'][0]
+    total_aircraft = get_data("SELECT COUNT(*) as count FROM aircraft")['count'][0]
+    total_airports = get_data("SELECT COUNT(*) as count FROM airports")['count'][0]
+    total_airlines = get_data("SELECT COUNT(DISTINCT airline_name) as count FROM flights")['count'][0]
+    
+    col1.metric("✈️ Total Flights", f"{total_flights:,}")
+    col2.metric("🛩️ Aircraft", f"{total_aircraft:,}")
+    col3.metric("🏢 Airports", f"{total_airports}")
+    col4.metric("🏢 Airlines", f"{total_airlines}")
+    
+    st.markdown("---")
+    
+    # Key Insights in 2 columns
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📊 Flight Status Distribution")
+        status_data = get_data("""
+            SELECT status, COUNT(*) as count 
+            FROM flights 
+            GROUP BY status 
+            ORDER BY count DESC
+        """)
+        fig = px.pie(status_data, values='count', names='status', 
+                     title='Flight Status Breakdown',
+                     color_discrete_sequence=px.colors.qualitative.Set3)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.subheader("🏢 Top 5 Airlines by Flight Count")
+        airline_data = get_data("""
+            SELECT airline_name, COUNT(*) as flight_count 
+            FROM flights 
+            GROUP BY airline_name 
+            ORDER BY flight_count DESC 
+            LIMIT 5
+        """)
+        fig = px.bar(airline_data, x='airline_name', y='flight_count',
+                     title='Busiest Airlines',
+                     labels={'airline_name': 'Airline', 'flight_count': 'Flights'},
+                     color='flight_count',
+                     color_continuous_scale='Blues')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Busiest Routes
+    st.subheader("🔥 Top 10 Busiest Routes")
+    route_data = get_data("""
+        SELECT 
+            origin.city || ' → ' || dest.city AS route,
+            origin.iata_code || '-' || dest.iata_code AS codes,
+            COUNT(*) as flight_count
+        FROM flights f
+        JOIN airports origin ON f.origin_icao = origin.icao_code
+        JOIN airports dest ON f.dest_icao = dest.icao_code
+        GROUP BY route, codes
+        ORDER BY flight_count DESC
+        LIMIT 10
+    """)
+    fig = px.bar(route_data, x='route', y='flight_count',
+                 title='Most Popular Routes',
+                 labels={'route': 'Route', 'flight_count': 'Number of Flights'},
+                 text='flight_count')
+    fig.update_traces(texttemplate='%{text}', textposition='outside')
+    st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================================
+# ✈️ PAGE 2: FLIGHT EXPLORER
+# ============================================================================
+
+elif page == "✈️ Flight Explorer":
+    st.title("✈️ Flight Explorer")
+    st.markdown("Search and filter flights with detailed information")
+    
+    # Filters
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        airlines = get_data("SELECT DISTINCT airline_name FROM flights ORDER BY airline_name")['airline_name'].tolist()
+        selected_airline = st.selectbox("Select Airline", ["All"] + airlines)
+    
+    with col2:
+        statuses = get_data("SELECT DISTINCT status FROM flights ORDER BY status")['status'].tolist()
+        selected_status = st.selectbox("Select Status", ["All"] + statuses)
+    
+    with col3:
+        airports = get_data("SELECT DISTINCT iata_code FROM airports ORDER BY iata_code")['iata_code'].tolist()
+        selected_origin = st.selectbox("Origin Airport", ["All"] + airports)
+    
+    # Build query based on filters
+    query = """
+        SELECT 
+            f.flight_number,
+            f.airline_name,
+            a.aircraft_model,
+            origin.iata_code AS origin,
+            origin.city AS origin_city,
+            dest.iata_code AS destination,
+            dest.city AS dest_city,
+            f.scheduled_dep,
+            f.actual_dep,
+            f.delay_dep,
+            f.status
+        FROM flights f
+        JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
+        JOIN airports origin ON f.origin_icao = origin.icao_code
+        JOIN airports dest ON f.dest_icao = dest.icao_code
+        WHERE 1=1
+    """
+    
+    params = []
+    if selected_airline != "All":
+        query += " AND f.airline_name = ?"
+        params.append(selected_airline)
+    if selected_status != "All":
+        query += " AND f.status = ?"
+        params.append(selected_status)
+    if selected_origin != "All":
+        query += " AND origin.iata_code = ?"
+        params.append(selected_origin)
+    
+    query += " ORDER BY f.scheduled_dep DESC LIMIT 100"
+    
+    flights_df = get_data(query, tuple(params) if params else None)
+    
+    st.subheader(f"📋 Showing {len(flights_df)} flights")
+    st.dataframe(flights_df, use_container_width=True, height=400)
+    
+    # Flight Statistics
+    if len(flights_df) > 0:
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Flights", len(flights_df))
+        col2.metric("Avg Delay (min)", f"{flights_df['delay_dep'].mean():.1f}")
+        col3.metric("On-Time %", f"{(flights_df['status'] == 'Landed').sum() / len(flights_df) * 100:.1f}%")
+
+# ============================================================================
+# 🛩️ PAGE 3: AIRCRAFT ANALYTICS
+# ============================================================================
+
+elif page == "🛩️ Aircraft Analytics":
+    st.title("🛩️ Aircraft Analytics")
+    
+    # Top Aircraft Models
+    st.subheader("📊 Top 10 Aircraft Models by Flight Count")
+    aircraft_stats = get_data("""
+        SELECT 
+            a.aircraft_model,
+            a.manufacturer,
+            COUNT(f.flight_id) as flight_count,
+            COUNT(DISTINCT f.airline_name) as airlines_using
+        FROM aircraft a
+        JOIN flights f ON a.aircraft_reg = f.aircraft_reg
+        GROUP BY a.aircraft_model, a.manufacturer
+        ORDER BY flight_count DESC
+        LIMIT 10
+    """)
+    
+    fig = px.bar(aircraft_stats, x='aircraft_model', y='flight_count',
+                 color='manufacturer',
+                 title='Most Used Aircraft Models',
+                 labels={'aircraft_model': 'Aircraft Model', 'flight_count': 'Number of Flights'},
+                 text='flight_count')
+    fig.update_traces(texttemplate='%{text}', textposition='outside')
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Detailed Table
+    st.subheader("📋 Aircraft Fleet Details")
+    st.dataframe(aircraft_stats, use_container_width=True)
+    
+    # Manufacturer Distribution
+    st.subheader("🏭 Manufacturer Distribution")
+    mfr_data = get_data("""
+        SELECT manufacturer, COUNT(*) as aircraft_count
+        FROM aircraft
+        GROUP BY manufacturer
+        ORDER BY aircraft_count DESC
+    """)
+    
+    fig = px.pie(mfr_data, values='aircraft_count', names='manufacturer',
+                 title='Aircraft by Manufacturer')
+    st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================================
+# 🏢 PAGE 4: AIRPORT ANALYSIS
+# ============================================================================
+
+elif page == "🏢 Airport Analysis":
+    st.title("🏢 Airport Analysis")
+    
+    # Airport selector
+    airports = get_data("SELECT iata_code, name, city FROM airports ORDER BY name")
+    selected_airport = st.selectbox(
+        "Select Airport",
+        airports['iata_code'].tolist(),
+        format_func=lambda x: f"{x} - {airports[airports['iata_code']==x]['name'].values[0]}"
+    )
+    
+    # Airport Details
+    airport_info = get_data(
+        "SELECT * FROM airports WHERE iata_code = ?",
+        (selected_airport,)
+    )
+    
+    if not airport_info.empty:
+        st.subheader(f"📍 {airport_info['name'].values[0]}")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("City", airport_info['city'].values[0])
+        col2.metric("Country", airport_info['country'].values[0])
+        col3.metric("Timezone", airport_info['timezone'].values[0])
+        
+        # Map
+        st.subheader("🗺️ Location")
+        map_data = pd.DataFrame({
+            'lat': [airport_info['latitude'].values[0]],
+            'lon': [airport_info['longitude'].values[0]]
+        })
+        st.map(map_data, zoom=10)
+    
+    # Traffic Statistics
+    st.subheader("📊 Traffic Statistics")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        departures = get_data("""
+            SELECT COUNT(*) as count
+            FROM flights f
+            JOIN airports a ON f.origin_icao = a.icao_code
+            WHERE a.iata_code = ?
+        """, (selected_airport,))['count'][0]
+        st.metric("Departures", f"{departures:,}")
+    
+    with col2:
+        arrivals = get_data("""
+            SELECT COUNT(*) as count
+            FROM flights f
+            JOIN airports a ON f.dest_icao = a.icao_code
+            WHERE a.iata_code = ?
+        """, (selected_airport,))['count'][0]
+        st.metric("Arrivals", f"{arrivals:,}")
+    
+    # Top Destinations from this airport
+    st.subheader("🎯 Top Destinations")
+    destinations = get_data("""
+        SELECT 
+            dest.iata_code,
+            dest.name,
+            dest.city,
+            COUNT(*) as flight_count
+        FROM flights f
+        JOIN airports origin ON f.origin_icao = origin.icao_code
+        JOIN airports dest ON f.dest_icao = dest.icao_code
+        WHERE origin.iata_code = ?
+        GROUP BY dest.iata_code, dest.name, dest.city
+        ORDER BY flight_count DESC
+        LIMIT 10
+    """, (selected_airport,))
+    
+    fig = px.bar(destinations, x='name', y='flight_count',
+                 title='Most Frequent Destinations',
+                 labels={'name': 'Destination', 'flight_count': 'Flights'})
+    st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================================
+# ⏰ PAGE 5: DELAY INSIGHTS
+# ============================================================================
+
+elif page == "⏰ Delay Insights":
+    st.title("⏰ Delay Insights")
+    
+    # Delay Statistics
+    st.subheader("📊 Delay Overview")
+    
+    delay_stats = get_data("""
+        SELECT 
+            COUNT(*) as total_flights,
+            SUM(CASE WHEN delay_dep > 0 THEN 1 ELSE 0 END) as delayed_flights,
+            ROUND(AVG(CASE WHEN delay_dep > 0 THEN delay_dep END), 2) as avg_delay,
+            MAX(delay_dep) as max_delay
+        FROM flights
+    """)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Flights", f"{delay_stats['total_flights'].values[0]:,}")
+    col2.metric("Delayed Flights", f"{delay_stats['delayed_flights'].values[0]:,}")
+    col3.metric("Avg Delay (min)", f"{delay_stats['avg_delay'].values[0]:.1f}")
+    col4.metric("Max Delay (min)", f"{delay_stats['max_delay'].values[0]:.0f}")
+    
+    # Delay by Airport
+    st.subheader("🏢 Delays by Airport")
+    airport_delays = get_data("""
+        SELECT 
+            ap.name AS airport_name,
+            ap.iata_code,
+            COUNT(f.flight_id) as total_flights,
+            SUM(CASE WHEN f.delay_dep > 0 THEN 1 ELSE 0 END) as delayed_flights,
+            ROUND(AVG(CASE WHEN f.delay_dep > 0 THEN f.delay_dep END), 2) as avg_delay,
+            ROUND((SUM(CASE WHEN f.delay_dep > 0 THEN 1 ELSE 0 END) * 100.0) / COUNT(f.flight_id), 2) as delay_percentage
+        FROM airports ap
+        JOIN flights f ON ap.icao_code = f.origin_icao
+        GROUP BY ap.name, ap.iata_code
+        HAVING total_flights > 10
+        ORDER BY delay_percentage DESC
+    """)
+    
+    fig = px.bar(airport_delays, x='iata_code', y='delay_percentage',
+                 title='Delay Percentage by Airport',
+                 labels={'iata_code': 'Airport', 'delay_percentage': 'Delay %'},
+                 hover_data=['airport_name', 'total_flights', 'avg_delay'])
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Detailed Table
+    st.subheader("📋 Detailed Delay Statistics")
+    st.dataframe(airport_delays, use_container_width=True)
+
+# ============================================================================
+# 📊 PAGE 6: SQL QUERY RESULTS
+# ============================================================================
+
+elif page == "📊 SQL Query Results":
+    st.title("📊 SQL Query Results")
+    st.markdown("View results of all 11 GUVI required queries")
+    
+    query_options = {
+        "Query 1: Flights per Aircraft Model": """
+            SELECT a.aircraft_model, COUNT(f.flight_id) as total_flights
+            FROM flights f
+            JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
+            GROUP BY a.aircraft_model
+            ORDER BY total_flights DESC
+        """,
+        "Query 2: Aircraft with 5+ Flights": """
+            SELECT a.aircraft_reg, a.aircraft_model, COUNT(f.flight_id) as flight_count
+            FROM aircraft a
+            JOIN flights f ON a.aircraft_reg = f.aircraft_reg
+            GROUP BY a.aircraft_reg, a.aircraft_model
+            HAVING flight_count > 5
+            ORDER BY flight_count DESC
+        """,
+        "Query 3: Airports with 5+ Outbound Flights": """
+            SELECT ap.name, COUNT(f.flight_id) as outbound_flights
+            FROM airports ap
+            JOIN flights f ON ap.icao_code = f.origin_icao
+            GROUP BY ap.icao_code, ap.name
+            HAVING outbound_flights > 5
+            ORDER BY outbound_flights DESC
+        """,
+        "Query 4: Top 3 Destinations": """
+            SELECT ap.name, ap.city, COUNT(f.flight_id) as arriving_flights
+            FROM airports ap
+            JOIN flights f ON ap.icao_code = f.dest_icao
+            GROUP BY ap.icao_code, ap.name, ap.city
+            ORDER BY arriving_flights DESC
+            LIMIT 3
+        """,
+        "Query 5: Domestic vs International": """
+            SELECT 
+                CASE WHEN origin.country = dest.country THEN 'Domestic' ELSE 'International' END as flight_type,
+                COUNT(*) as count
+            FROM flights f
+            JOIN airports origin ON f.origin_icao = origin.icao_code
+            JOIN airports dest ON f.dest_icao = dest.icao_code
+            GROUP BY flight_type
+        """
+    }
+    
+    selected_query = st.selectbox("Select Query", list(query_options.keys()))
+    
+    if st.button("Execute Query"):
+        with st.spinner("Executing query..."):
+            result = get_data(query_options[selected_query])
+            st.success(f"Query returned {len(result)} rows")
+            st.dataframe(result, use_container_width=True)
+            
+            # Download option
+            csv = result.to_csv(index=False)
+            st.download_button(
+                label="📥 Download as CSV",
+                data=csv,
+                file_name=f"{selected_query.replace(' ', '_')}.csv",
+                mime="text/csv"
+            )
+
+# ============================================================================
+# 👨‍💻 PAGE 7: ABOUT PROJECT
+# ============================================================================
+
+elif page == "👨‍💻 About Project":
+    st.title("👨‍💻 About This Project")
+    
+    st.markdown("""
+    ## 🎯 Air Tracker: Flight Analytics
+    
+    **GUVI IIT-M Capstone Project**  
+    **Domain:** Aviation / Data Analytics
+    
+    ### 📌 Project Overview
+    This comprehensive aviation analytics platform extracts, stores, and visualizes 
+    flight data from the AeroDataBox API. The application provides insights into:
+    - Airport operations and traffic patterns
+    - Aircraft utilization and fleet analytics
+    - Flight delays and performance metrics
+    - Route analysis and airline statistics
+    
+    ### 🛠️ Technologies Used
+    - **Backend:** Python 3.10+, SQLite3
+    - **Frontend:** Streamlit
+    - **Visualization:** Plotly, Pandas
+    - **Data Source:** AeroDataBox API
+    
+    ### 📊 Database Schema
+    - **airports:** 12 major airports
+    - **aircraft:** 2,370+ aircraft records
+    - **flights:** 32,824+ flight records
+    - **airport_delays:** Aggregated delay statistics
+    
+    ### ✅ Key Features
+    - ✈️ Real-time flight exploration with filters
+    - 🛩️ Aircraft fleet analytics
+    - 🏢 Airport traffic analysis
+    - ⏰ Delay insights and trends
+    - 📊 11 comprehensive SQL queries
+    - 🗺️ Interactive maps
+    
+    ### 👨‍💻 Developer Information
+    **Created by:** [Your Name]  
+    **LinkedIn:** [Your LinkedIn]  
+    **GitHub:** [Your GitHub]  
+    **Email:** [Your Email]
+    
+    ### 📚 Project Structure
+```
+    air-tracker/
+    ├── app.py                 # Streamlit application
+    ├── air_tracker.db        # SQLite database
+    ├── data_collection.ipynb # API data extraction
+    ├── requirements.txt      # Dependencies
+    └── README.md            # Documentation
+```
+    
+    ### 🎓 Skills Demonstrated
+    - API Integration & Data Extraction
+    - Database Design & SQL Queries
+    - Data Analysis & Visualization
+    - Web Application Development
+    - Project Documentation
+    
+    ---
+    
+    **© 2024 Air Tracker | GUVI IIT-M Capstone Project**
+    """)
+    
+    # GitHub Stats (optional)
+    st.subheader("📈 Project Statistics")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Flights Analyzed", "32,824")
+    col2.metric("Aircraft Tracked", "2,370")
+    col3.metric("Airports Covered", "12")
