@@ -77,7 +77,7 @@ page = st.sidebar.radio(
     ["🏠 Home Dashboard", 
      "✈️ Flight Explorer", 
      "🛩️ Aircraft Analytics",
-     "🏢 Airport Analysis",
+     "🏢 Airport Location",
      "⏰ Delay Insights",
      "📊 SQL Query Results",
      "👨‍💻 About Project"]
@@ -297,29 +297,7 @@ elif page == "🏢 Airport Analysis":
             'lon': [airport_info['longitude'].values[0]]
         })
         st.map(map_data, zoom=10)
-    
-    # Traffic Statistics
-    st.subheader("📊 Traffic Statistics")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        departures = get_data("""
-            SELECT COUNT(*) as count
-            FROM flights f
-            LEFT JOIN airports a ON f.origin_icao = a.icao_code
-            WHERE a.iata_code = ?
-        """, (selected_airport,))['count'][0]
-        st.metric("Departures", f"{departures:,}")
-    
-    with col2:
-        arrivals = get_data("""
-            SELECT COUNT(*) as count
-            FROM flights f
-            LEFT JOIN airports a ON f.dest_icao = a.icao_code
-            WHERE a.iata_code = ?
-        """, (selected_airport,))['count'][0]
-        st.metric("Arrivals", f"{arrivals:,}")
-
+ 
 # ============================================================================
 # ⏰ PAGE 5: DELAY INSIGHTS
 # ============================================================================
