@@ -176,8 +176,8 @@ elif page == "✈️ Flight Explorer":
         )["iata_code"].tolist()
         selected_origin = st.selectbox("Origin Airport", ["All"] + airports)
 
-    # Base query: flights with a valid origin
-    query = """
+    # ------------------ BASE QUERY (for metrics: NO status filter) ------------------
+    base_query = """
         SELECT
             f.flight_number,
             f.airline_name,
@@ -190,31 +190,36 @@ elif page == "✈️ Flight Explorer":
         WHERE 1 = 1
     """
 
-    params = []
+    base_params = []
     if selected_airline != "All":
-        query += " AND f.airline_name = ?"
-        params.append(selected_airline)
+        base_query += " AND f.airline_name = ?"
+        base_params.append(selected_airline)
+    if selected_origin != "All":
+        base_query += " AND origin.iata_code = ?"
+        base_params.append(selected_origin)
+
+    # full set for this airline/origin, all statuses
+    base_df = get_data(base_query, tuple(base_params) if base_params else None)
+
+    # ------------------ TABLE QUERY (optional extra status filter) ------------------
+    table_query = base_query      # start from same query text
+    table_params = list(base_params)
 
     if selected_status != "All":
-        query += " AND f.status = ?"
-        params.append(selected_status)
+        table_query += " AND f.status = ?"
+        table_params.append(selected_status)
 
-    if selected_origin != "All":
-        query += " AND origin.iata_code = ?"
-        params.append(selected_origin)
-
-    query += " ORDER BY f.scheduled_dep DESC LIMIT 100"
-
-    flights_df = get_data(query, tuple(params) if params else None)
+    table_query += " ORDER BY f.scheduled_dep DESC LIMIT 100"
+    flights_df = get_data(table_query, tuple(table_params) if table_params else None)
 
     st.subheader(f"📋 Showing {len(flights_df)} flights")
     st.dataframe(flights_df, use_container_width=True, height=400)
 
-    # --- CANCELLATION METRICS BASED ON CURRENT FILTER ---
-    total_flights = len(flights_df)
+    # ------------------ CANCELLATION METRICS (always from base_df) ------------------
+    total_flights = len(base_df)
 
-    if total_flights > 0 and "status" in flights_df.columns:
-        canceled_count = (flights_df["status"] == "Canceled").sum()
+    if total_flights > 0 and "status" in base_df.columns:
+        canceled_count = (base_df["status"] == "Canceled").sum()
         canceled_pct = (canceled_count / total_flights) * 100
 
         m1, m2, m3 = st.columns(3)
