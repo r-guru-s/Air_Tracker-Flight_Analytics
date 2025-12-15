@@ -263,11 +263,11 @@ elif page == "🛩️ Aircraft Analytics":
     st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================================
-# 🏢 PAGE 4: AIRPORT ANALYSIS
+# 🏢 PAGE 4: AIRPORT LOCATION
 # ============================================================================
 
-elif page == "🏢 Airport Analysis":
-    st.title("🏢 Airport Analysis")
+elif page == "🏢 Airport Location":
+    st.title("🏢 Airport Location")
     
     # Airport selector
     airports = get_data("SELECT iata_code, name, city FROM airports ORDER BY name")
