@@ -176,7 +176,7 @@ elif page == "✈️ Flight Explorer":
         )["iata_code"].tolist()
         selected_origin = st.selectbox("Origin Airport", ["All"] + airports)
 
-    # Build query based on filters (no delay / actual_dep)
+    # Base query: only non‑empty origin
     query = """
         SELECT
             f.flight_number,
@@ -194,9 +194,12 @@ elif page == "✈️ Flight Explorer":
     if selected_airline != "All":
         query += " AND f.airline_name = ?"
         params.append(selected_airline)
+
     if selected_status != "All":
+        # when user selects a status, really filter to that status
         query += " AND f.status = ?"
         params.append(selected_status)
+
     if selected_origin != "All":
         query += " AND origin.iata_code = ?"
         params.append(selected_origin)
@@ -208,17 +211,22 @@ elif page == "✈️ Flight Explorer":
     st.subheader(f"📋 Showing {len(flights_df)} flights")
     st.dataframe(flights_df, use_container_width=True, height=400)
 
-    # Flight / Cancellation Statistics
-    if len(flights_df) > 0:
-        col1, col2, col3 = st.columns(3)
-
+    # Flight / Cancellation statistics, always based on current filter
+    if not flights_df.empty:
         total_flights = len(flights_df)
         canceled_count = (flights_df["status"] == "Canceled").sum()
-        canceled_pct = (canceled_count / total_flights) * 100 if total_flights > 0 else 0
+        canceled_pct = (canceled_count / total_flights) * 100 if total_flights else 0.0
 
-        col1.metric("Total Flights", total_flights)
-        col2.metric("Canceled Flights", canceled_count)
-        col3.metric("Canceled %", f"{canceled_pct:.1f}%")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Flights", total_flights)
+        m2.metric("Canceled Flights", int(canceled_count))
+        m3.metric("Canceled %", f"{canceled_pct:.1f}%")
+    else:
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Flights", 0)
+        m2.metric("Canceled Flights", 0)
+        m3.metric("Canceled %", "0.0%")
+
 
 
 # ============================================================================
