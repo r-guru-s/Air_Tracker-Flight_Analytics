@@ -209,7 +209,7 @@ elif page == "✈️ Flight Explorer":
         table_query += " AND f.status = ?"
         table_params.append(selected_status)
 
-    table_query += " ORDER BY f.scheduled_dep DESC LIMIT 100"
+    table_query += " ORDER BY f.scheduled_dep DESC LIMIT 1000"
     flights_df = get_data(table_query, tuple(table_params) if table_params else None)
 
     st.subheader(f"📋 Showing {len(flights_df)} flights")
@@ -220,7 +220,7 @@ elif page == "✈️ Flight Explorer":
 
     if total_flights > 0 and "status" in base_df.columns:
         canceled_count = (base_df["status"] == "Canceled").sum()
-        canceled_pct = (canceled_count / total_flights) * 100
+        canceled_pct = (canceled_count / total_flights) * 1000
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total Flights", total_flights)
