@@ -146,7 +146,7 @@ if page == "🏠 Home Dashboard":
                      color='flight_count',
                      color_continuous_scale='Blues')
         st.plotly_chart(fig, use_container_width=True)
-
+        
 # ============================================================================
 # ✈️ PAGE 2: FLIGHT EXPLORER
 # ============================================================================
@@ -159,15 +159,21 @@ elif page == "✈️ Flight Explorer":
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        airlines = get_data("SELECT DISTINCT airline_name FROM flights ORDER BY airline_name")['airline_name'].tolist()
+        airlines = get_data(
+            "SELECT DISTINCT airline_name FROM flights ORDER BY airline_name"
+        )["airline_name"].tolist()
         selected_airline = st.selectbox("Select Airline", ["All"] + airlines)
     
     with col2:
-        statuses = get_data("SELECT DISTINCT status FROM flights ORDER BY status")['status'].tolist()
+        statuses = get_data(
+            "SELECT DISTINCT status FROM flights ORDER BY status"
+        )["status"].tolist()
         selected_status = st.selectbox("Select Status", ["All"] + statuses)
     
     with col3:
-        airports = get_data("SELECT DISTINCT iata_code FROM airports ORDER BY iata_code")['iata_code'].tolist()
+        airports = get_data(
+            "SELECT DISTINCT iata_code FROM airports ORDER BY iata_code"
+        )["iata_code"].tolist()
         selected_origin = st.selectbox("Origin Airport", ["All"] + airports)
     
     # Build query based on filters
@@ -190,7 +196,7 @@ elif page == "✈️ Flight Explorer":
     LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
     LEFT JOIN airports dest   ON f.dest_icao   = dest.icao_code
     WHERE 1 = 1
-"""
+    """
     params = []
     if selected_airline != "All":
         query += " AND f.airline_name = ?"
@@ -213,7 +219,22 @@ elif page == "✈️ Flight Explorer":
     if len(flights_df) > 0:
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Flights", len(flights_df))
-        col2.metric("Avg Delay (min)", f"{flights_df['delay_dep'].mean():.1f}")
+
+        # use delay_dep_min (from COALESCE in SELECT), not delay_dep
+        if "delay_dep_min" in flights_df.columns:
+            avg_delay = flights_df["delay_dep_min"].mean()
+            col2.metric("Avg Delay (min)", f"{avg_delay:.1f}")
+        else:
+            col2.metric("Avg Delay (min)", "N/A")
+
+        # simple on-time percentage using status (optional)
+        if "status" in flights_df.columns:
+            ontime = flights_df["status"].isin(["Arrived", "Landed"]).sum()
+            pct = (ontime / len(flights_df)) * 100 if len(flights_df) > 0 else 0
+            col3.metric("On-time / Landed %", f"{pct:.1f}%")
+        else:
+            col3.metric("On-time / Landed %", "N/A")
+
 
 # ============================================================================
 # 🛩️ PAGE 3: AIRCRAFT ANALYTICS
