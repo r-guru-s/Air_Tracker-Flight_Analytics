@@ -206,9 +206,9 @@ elif page == "✈️ Flight Explorer":
             f.delay_dep,
             f.status
         FROM flights f
-        JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
-        JOIN airports origin ON f.origin_icao = origin.icao_code
-        JOIN airports dest ON f.dest_icao = dest.icao_code
+        LEFT JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
+        LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
+        LEFT JOIN airports dest ON f.dest_icao = dest.icao_code
         WHERE 1=1
     """
     
@@ -425,46 +425,163 @@ elif page == "📊 SQL Query Results":
     st.markdown("View results of all 11 GUVI required queries")
     
     query_options = {
-        "Query 1: Flights per Aircraft Model": """
-            SELECT a.aircraft_model, COUNT(f.flight_id) as total_flights
+                "1) Flights per Aircraft Model": """
+            SELECT 
+                a.aircraft_model,
+                COUNT(f.flight_id) AS total_flights
             FROM flights f
             JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
             GROUP BY a.aircraft_model
             ORDER BY total_flights DESC
         """,
-        "Query 2: Aircraft with 5+ Flights": """
-            SELECT a.aircraft_reg, a.aircraft_model, COUNT(f.flight_id) as flight_count
+        "2) Aircraft with > 5 Flights": """
+            SELECT 
+                a.aircraft_reg   AS registration,
+                a.aircraft_model AS model,
+                a.manufacturer,
+                COUNT(f.flight_id) AS flight_count
             FROM aircraft a
             JOIN flights f ON a.aircraft_reg = f.aircraft_reg
-            GROUP BY a.aircraft_reg, a.aircraft_model
-            HAVING flight_count > 5
+            GROUP BY a.aircraft_reg, a.aircraft_model, a.manufacturer
+            HAVING COUNT(f.flight_id) > 5
             ORDER BY flight_count DESC
         """,
-        "Query 3: Airports with 5+ Outbound Flights": """
-            SELECT ap.name, COUNT(f.flight_id) as outbound_flights
+        "3) Airports with > 5 Outbound Flights": """
+            SELECT 
+                ap.name AS airport_name,
+                ap.city,
+                ap.country,
+                COUNT(f.flight_id) AS outbound_flights
             FROM airports ap
             JOIN flights f ON ap.icao_code = f.origin_icao
-            GROUP BY ap.icao_code, ap.name
-            HAVING outbound_flights > 5
+            GROUP BY ap.icao_code, ap.name, ap.city, ap.country
+            HAVING COUNT(f.flight_id) > 5
             ORDER BY outbound_flights DESC
         """,
-        "Query 4: Top 3 Destinations": """
-            SELECT ap.name, ap.city, COUNT(f.flight_id) as arriving_flights
+        "4) Top 3 Destination Airports": """
+            SELECT 
+                ap.name AS airport_name,
+                ap.city,
+                ap.country,
+                COUNT(f.flight_id) AS arriving_flights
             FROM airports ap
             JOIN flights f ON ap.icao_code = f.dest_icao
-            GROUP BY ap.icao_code, ap.name, ap.city
+            GROUP BY ap.icao_code, ap.name, ap.city, ap.country
             ORDER BY arriving_flights DESC
             LIMIT 3
         """,
-        "Query 5: Domestic vs International": """
+        "5) Domestic vs International (Per Flight)": """
             SELECT 
-                CASE WHEN origin.country = dest.country THEN 'Domestic' ELSE 'International' END as flight_type,
-                COUNT(*) as count
+                f.flight_number,
+                origin.iata_code AS origin,
+                origin.country   AS origin_country,
+                dest.iata_code   AS destination,
+                dest.country     AS dest_country,
+                CASE 
+                    WHEN origin.country = dest.country THEN 'Domestic'
+                    ELSE 'International'
+                END AS flight_type
             FROM flights f
-            JOIN airports origin ON f.origin_icao = origin.icao_code
-            JOIN airports dest ON f.dest_icao = dest.icao_code
-            GROUP BY flight_type
-        """
+            LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
+            LEFT JOIN airports dest   ON f.dest_icao   = dest.icao_code
+            WHERE origin.icao_code IS NOT NULL
+               OR dest.icao_code   IS NOT NULL
+            LIMIT 200
+        """,
+        "6) 5 Most Recent Arrivals at DEL": """
+            SELECT 
+                f.flight_number,
+                a.aircraft_model AS aircraft,
+                a.manufacturer,
+                origin.name AS departure_airport,
+                origin.city AS departure_city,
+                f.actual_arr AS arrival_time,
+                f.status
+            FROM flights f
+            LEFT JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
+            LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
+            LEFT JOIN airports dest   ON f.dest_icao   = dest.icao_code
+            WHERE dest.iata_code = 'DEL'
+            ORDER BY f.scheduled_arr DESC
+            LIMIT 5
+        """,
+        "7) Airports with No Arriving Flights": """
+            SELECT 
+                ap.iata_code,
+                ap.name   AS airport_name,
+                ap.city,
+                ap.country
+            FROM airports ap
+            LEFT JOIN flights f ON ap.icao_code = f.dest_icao
+            WHERE f.flight_id IS NULL
+            ORDER BY ap.name
+        """,
+        "8) Flights by Status per Airline": """
+            SELECT 
+                f.airline_name,
+                SUM(CASE WHEN f.status = 'Arrived'     THEN 1 ELSE 0 END) AS arrived,
+                SUM(CASE WHEN f.status = 'Departed'    THEN 1 ELSE 0 END) AS departed,
+                SUM(CASE WHEN f.status = 'Unknown'     THEN 1 ELSE 0 END) AS unknown,
+                SUM(CASE WHEN f.status = 'Expected'    THEN 1 ELSE 0 END) AS expected,
+                SUM(CASE WHEN f.status = 'Approaching' THEN 1 ELSE 0 END) AS approaching,
+                SUM(CASE WHEN f.status = 'Canceled'    THEN 1 ELSE 0 END) AS canceled,
+                SUM(CASE WHEN f.status = 'Delayed'     THEN 1 ELSE 0 END) AS delayed,
+                COUNT(f.flight_id) AS total_flights
+            FROM flights f
+            GROUP BY f.airline_name
+            ORDER BY total_flights DESC
+        """,
+        "9) All Cancelled Flights": """
+            SELECT 
+                f.flight_number,
+                f.airline_name,
+                dest.name AS destination_airport,
+                dest.city AS destination_city,
+                f.scheduled_dep AS scheduled_departure,
+                f.status
+            FROM flights f
+            LEFT JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
+            LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
+            LEFT JOIN airports dest   ON f.dest_icao   = dest.icao_code
+            WHERE f.status = 'Canceled'
+            ORDER BY f.scheduled_dep DESC NULLS LAST
+        """,
+        "10) City Pairs with > 2 Aircraft Models": """
+            SELECT 
+                origin.city AS origin_city,
+                dest.city   AS dest_city,
+                origin.iata_code AS origin_code,
+                dest.iata_code   AS dest_code,
+                COUNT(DISTINCT a.aircraft_model) AS aircraft_model_count,
+                GROUP_CONCAT(DISTINCT a.aircraft_model) AS aircraft_models
+            FROM flights f
+            LEFT JOIN airports origin ON f.origin_icao = origin.icao_code
+            LEFT JOIN airports dest   ON f.dest_icao   = dest.icao_code
+            LEFT JOIN aircraft a      ON f.aircraft_reg = a.aircraft_reg
+            GROUP BY origin.city, dest.city, origin.iata_code, dest.iata_code
+            HAVING COUNT(DISTINCT a.aircraft_model) > 2
+            ORDER BY aircraft_model_count DESC
+            LIMIT 20
+        """,
+        "11) % Delayed Arrivals per Destination": """
+            SELECT 
+                ap.name AS airport_name,
+                ap.city,
+                ap.iata_code,
+                COUNT(f.flight_id) AS total_arrivals,
+                SUM(CASE WHEN f.status = 'Delayed' OR f.delay_arr > 0 THEN 1 ELSE 0 END)
+                    AS delayed_arrivals,
+                ROUND(
+                    (SUM(CASE WHEN f.status = 'Delayed' OR f.delay_arr > 0 THEN 1 ELSE 0 END)
+                    * 100.0) / COUNT(f.flight_id),
+                    2
+                ) AS delay_percentage
+            FROM airports ap
+            JOIN flights f ON ap.icao_code = f.dest_icao
+            GROUP BY ap.icao_code, ap.name, ap.city, ap.iata_code
+            HAVING COUNT(f.flight_id) > 0
+            ORDER BY delay_percentage DESC
+        """,
     }
     
     selected_query = st.selectbox("Select Query", list(query_options.keys()))
