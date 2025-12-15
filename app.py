@@ -154,43 +154,40 @@ if page == "🏠 Home Dashboard":
 elif page == "✈️ Flight Explorer":
     st.title("✈️ Flight Explorer")
     st.markdown("Search and filter flights with detailed information")
-    
+
     # Filters
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
         airlines = get_data(
             "SELECT DISTINCT airline_name FROM flights ORDER BY airline_name"
         )["airline_name"].tolist()
         selected_airline = st.selectbox("Select Airline", ["All"] + airlines)
-    
+
     with col2:
         statuses = get_data(
             "SELECT DISTINCT status FROM flights ORDER BY status"
         )["status"].tolist()
         selected_status = st.selectbox("Select Status", ["All"] + statuses)
-    
+
     with col3:
         airports = get_data(
             "SELECT DISTINCT iata_code FROM airports ORDER BY iata_code"
         )["iata_code"].tolist()
         selected_origin = st.selectbox("Origin Airport", ["All"] + airports)
-    
-    # Build query based on filters
+
+    # Build query based on filters (no delay / actual_dep)
     query = """
         SELECT
-        f.flight_number,
-        f.airline_name,
-        origin.iata_code AS origin,          -- no COALESCE here
-        origin.city      AS origin_city,
-        f.scheduled_dep,
-        f.actual_dep,
-        COALESCE(f.delay_dep, 0) AS delay_dep_min,
-        f.status
-    FROM flights f
-    LEFT JOIN aircraft a ON f.aircraft_reg = a.aircraft_reg
-    JOIN airports origin ON f.origin_icao = origin.icao_code   -- INNER JOIN to force non‑empty origin
-    WHERE 1 = 1
+            f.flight_number,
+            f.airline_name,
+            origin.iata_code AS origin,
+            origin.city      AS origin_city,
+            f.scheduled_dep,
+            f.status
+        FROM flights f
+        JOIN airports origin ON f.origin_icao = origin.icao_code
+        WHERE 1 = 1
     """
 
     params = []
@@ -203,33 +200,25 @@ elif page == "✈️ Flight Explorer":
     if selected_origin != "All":
         query += " AND origin.iata_code = ?"
         params.append(selected_origin)
-    
+
     query += " ORDER BY f.scheduled_dep DESC LIMIT 100"
-    
+
     flights_df = get_data(query, tuple(params) if params else None)
-    
+
     st.subheader(f"📋 Showing {len(flights_df)} flights")
     st.dataframe(flights_df, use_container_width=True, height=400)
-    
-    # Flight Statistics
+
+    # Flight / Cancellation Statistics
     if len(flights_df) > 0:
         col1, col2, col3 = st.columns(3)
-        col1.metric("Total Flights", len(flights_df))
 
-        # use delay_dep_min (from COALESCE in SELECT), not delay_dep
-        if "delay_dep_min" in flights_df.columns:
-            avg_delay = flights_df["delay_dep_min"].mean()
-            col2.metric("Avg Delay (min)", f"{avg_delay:.1f}")
-        else:
-            col2.metric("Avg Delay (min)", "N/A")
+        total_flights = len(flights_df)
+        canceled_count = (flights_df["status"] == "Canceled").sum()
+        canceled_pct = (canceled_count / total_flights) * 100 if total_flights > 0 else 0
 
-        # simple on-time percentage using status (optional)
-        if "status" in flights_df.columns:
-            ontime = flights_df["status"].isin(["Arrived", "Landed"]).sum()
-            pct = (ontime / len(flights_df)) * 100 if len(flights_df) > 0 else 0
-            col3.metric("On-time / Landed %", f"{pct:.1f}%")
-        else:
-            col3.metric("On-time / Landed %", "N/A")
+        col1.metric("Total Flights", total_flights)
+        col2.metric("Canceled Flights", canceled_count)
+        col3.metric("Canceled %", f"{canceled_pct:.1f}%")
 
 
 # ============================================================================
