@@ -493,43 +493,17 @@ elif page == "👨‍💻 About Project":
     
     st.markdown("""
     ## 🎯 Air Tracker: Flight Analytics
-    
-    **GUVI IIT-M Capstone Project**  
-    **Domain:** Aviation / Data Analytics
-    
     ### 📌 Project Overview
-    This comprehensive aviation analytics platform extracts, stores, and visualizes 
-    flight data from the AeroDataBox API. The application provides insights into:
-    - Airport operations and traffic patterns
-    - Aircraft utilization and fleet analytics
-    - Flight delays and performance metrics
-    - Route analysis and airline statistics
-    
-    ### 🛠️ Technologies Used
-    - **Backend:** Python 3.10+, SQLite3
-    - **Frontend:** Streamlit
-    - **Visualization:** Plotly, Pandas
-    - **Data Source:** AeroDataBox API
+    **GUVI Project**  
+    **Domain:** Aviation / Data Analytics
     
     ### 📊 Database Schema
     - **airports:** 12 major airports
     - **aircraft:** 2,370+ aircraft records
     - **flights:** 32,824+ flight records
-    - **airport_delays:** Aggregated delay statistics
-    
-    ### ✅ Key Features
-    - ✈️ Real-time flight exploration with filters
-    - 🛩️ Aircraft fleet analytics
-    - 🏢 Airport traffic analysis
-    - ⏰ Delay insights and trends
-    - 📊 11 comprehensive SQL queries
-    - 🗺️ Interactive maps
-    
+        
     ### 👨‍💻 Developer Information
-    **Created by:** [Your Name]  
-    **LinkedIn:** [Your LinkedIn]  
-    **GitHub:** [Your GitHub]  
-    **Email:** [Your Email]
+    **Created by:** [Rajaguru]
     
     ### 📚 Project Structure
 ```
@@ -540,22 +514,4 @@ elif page == "👨‍💻 About Project":
     ├── requirements.txt      # Dependencies
     └── README.md            # Documentation
 ```
-    
-    ### 🎓 Skills Demonstrated
-    - API Integration & Data Extraction
-    - Database Design & SQL Queries
-    - Data Analysis & Visualization
-    - Web Application Development
-    - Project Documentation
-    
-    ---
-    
-    **© 2024 Air Tracker | GUVI IIT-M Capstone Project**
     """)
-    
-    # GitHub Stats (optional)
-    st.subheader("📈 Project Statistics")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Flights Analyzed", "32,824")
-    col2.metric("Aircraft Tracked", "2,370")
-    col3.metric("Airports Covered", "12")
