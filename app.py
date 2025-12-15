@@ -220,7 +220,7 @@ elif page == "✈️ Flight Explorer":
 
     if total_flights > 0 and "status" in base_df.columns:
         canceled_count = (base_df["status"] == "Canceled").sum()
-        canceled_pct = (canceled_count / total_flights) * 1000
+        canceled_pct = (canceled_count / total_flights) * 100
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total Flights", total_flights)
