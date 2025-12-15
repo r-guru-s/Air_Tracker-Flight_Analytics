@@ -306,7 +306,7 @@ elif page == "🏢 Airport Analysis":
         departures = get_data("""
             SELECT COUNT(*) as count
             FROM flights f
-            JOIN airports a ON f.origin_icao = a.icao_code
+            LEFT JOIN airports a ON f.origin_icao = a.icao_code
             WHERE a.iata_code = ?
         """, (selected_airport,))['count'][0]
         st.metric("Departures", f"{departures:,}")
@@ -315,7 +315,7 @@ elif page == "🏢 Airport Analysis":
         arrivals = get_data("""
             SELECT COUNT(*) as count
             FROM flights f
-            JOIN airports a ON f.dest_icao = a.icao_code
+            LEFT JOIN airports a ON f.dest_icao = a.icao_code
             WHERE a.iata_code = ?
         """, (selected_airport,))['count'][0]
         st.metric("Arrivals", f"{arrivals:,}")
